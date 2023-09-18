@@ -67,52 +67,6 @@ def make_simulation_params(what, pnas=None, fast=False, **kwargs):
         params.append(p)
     return params[:3] if fast else params
 
-
-def jacobian(X, how):
-    x = X.fix
-    y = X.shifted
-    if how == 'OLS': ## Ordinary least squares
-        x_norm = np.linalg.norm(x)
-        return np.dot(x/x_norm, y/x_norm)
-    elif how == 'TLS': ## Total least squares
-        return np.corrcoef(x, y)[0,1]
-    raise NotImplementedError(f"{how} is not implemented. Choose from OLS and TLS")
-    
-def rypdal_sugihara(x, window=12, shift=-1, how='OLS'):
-    """
-    The feature of Rypdal and Sugihara. 
-    Returns numpy array L such that
-
-    L[t] = argmin_l || l x[t:t-window] - x[t-shift:t-window-shift]  ||
-
-    So that taking window =12 and shift = -1 gives a smoothed estimate
-    for l such that x[t]l ~ x[t+1] at time t
-
-    """
-    ## x.shift(-1)[t] == x[t+1]: if x = [1,4,5,9] then x.shift(-1) = [4,5,9,nan]  
-    dd = pd.DataFrame({'fix': x.values, 'shifted':x.shift(shift)}, index=x.index)
-    
-    L = np.full(dd.shape[0], np.nan)
-    for i in range(window, dd.shape[0]):
-        X = dd.iloc[i-window:i]
-        L[i] = jacobian(X, how=how)
-        # X = dd.iloc[i-window:i]
-        # x = X.fix
-        # y = X.shifted
-        # lin = np.dot(x,y) / np.linalg.norm(x)**2
-        # L[i] = lin 
-
-        ## This assert statement succeeds
-        # lm = LinearRegression(fit_intercept=False)
-        # lin_ = lm.fit(x.values.reshape(-1,1), y).coef_[0]
-        # assert np.abs(lin - lin_) < 1e-14
-  
-
-    # Dunno y this differs from L sometimes. It looks like it is doing the same
-    #L_ = (dd.fix * dd.shifted).rolling(window).sum() / dd.fix.rolling(window).apply(np.linalg.norm)**2   
-
-    return L#dd.assign(L=L, L_=L_.shift(-shift))
-
     
 def random_IC():
     init = np.random.exponential(scale=1.0, size=6).reshape(3, 2)
