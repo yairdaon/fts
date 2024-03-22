@@ -41,6 +41,10 @@ def multistrain_sde(
         tol=None,
         test_noise=None
 ):
+    """This implementation is Cobey and Baskerville's ***original***
+    implementation of the two strain model. It is slow.
+
+    """
     if random_seed is None:
         sys_rand = random.SystemRandom()
         random_seed = sys_rand.randint(0, 2 ** 31 - 1)
@@ -215,7 +219,8 @@ def pilot(sigma12,
           eps=0.1,
           dt_output=30,
           run_years=500):
-    """ Step size 0.03722011439646788"""
+    """Run pilot runs for the model to determine step size. Step size is
+    0.03722011439646788"""
     S_init, I_init = random_IC()
     start = time.time()
     res = multistrain_sde(

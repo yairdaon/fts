@@ -14,6 +14,7 @@ from fts.original import pilot
 
 @pytest.mark.skip(reason="Mighty slow")
 def test_pilot( ):
+    """Run pilot tests to determine minimal step size"""    
     p = dict(beta0=[1600, 1333],
              mu=0.02,
              psi=1,
@@ -29,6 +30,10 @@ def test_pilot( ):
 
 
 def test_slow_fast():
+    """Comparison of run time between our fast implementation and Cobey's 
+    slower implementation
+    """
+
     burn_in_years = 1
     run_years = 200
     dt_euler = 0.5

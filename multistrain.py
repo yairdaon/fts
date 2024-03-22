@@ -3,19 +3,19 @@ import time
 
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 from numba import jit
+from numba.core import types
 from numpy import sin, cos, pi, log, exp, sqrt, ceil
 
-from fts.helpers import random_IC
+from helpers import random_IC
 
 
 @jit(nopython=True)
 def multistrain_sde(
         dt_euler,
         t_end,
-        dt_output,
-        n_pathogens,
+        dt_output, 
+        n_pathogens, 
         logSs,
         logIs,
         CCs,
@@ -39,7 +39,8 @@ def multistrain_sde(
         continuous_force,
         test_noise,
         seed):
-    if not np.isnan(seed):
+    """ Numba code to run the two-strain model """
+    if seed is not None:# and isinstance(seed, types.Integer):
         np.random.seed(seed)
 
     pathogen_ids = range(n_pathogens)
@@ -114,12 +115,12 @@ def multistrain_sde(
 
 def run(run_years,
         burn_in_years,
-        beta1=0.3,
+        beta1=0.3, 
         beta2=0.25,
         sigma12=0.25,
         sigma21=0,
         pna=0,
-        ona=0,
+        ona=0, 
         beta_slope=0,
         beta_change_start=0,
         dt_output=30,
@@ -132,12 +133,77 @@ def run(run_years,
         eps2=0.1,
         n_pathogens=2,
         test_noise=None,
-        seed=np.nan,
+        seed=None,#np.nan,
         S_init=None,
         I_init=None,
         continuous_force=True,
         drop_burnin=False,
         **kwargs):
+    """Native python code to allocate arrays for and appropriately pack
+    the results of the numba code above
+   
+    Parameters:
+    - run_years: int
+        Simulation time user needs in years.
+    - burn_in_years: int
+        Initial period of simulation to discard (not considered in analysis). Total run time is run_years + burn_in_years
+    - beta1: float
+        Transmission force for the first pathogen.
+    - beta2: float
+        Transmission force for the second pathogen.
+    - sigma12: float
+        Cross-immunization that pathogen 2 elicits against pathogen 1.
+    - sigma21: float
+        Cross-immunization that pathogen 1 elicits against pathogen 2.
+    - pna: float
+        Process noise amplitude.
+    - ona: float
+        Observation noise amplitude.
+    - beta_slope: float
+        Slope of change in beta (transmission force) over time.
+    - beta_change_start: int
+        Year when change in beta starts.
+    - dt_output: float
+        Sampling time for output data.
+    - dt_euler: float
+        Time step for numerical integration using Eulers method.
+    - mu: float, optional
+        Natural mortality rate. Default is 1/(30*360), so if a year is 360 days then the average life span is 30 years.
+    - nu: float, optional
+        Recovery rate. Default is 0.2, so average time of illness and infectivity is 5 time units.
+    - psi: float, optional
+        Duration of a cycle of the environmental driver in "time
+        units". So psi=360 means a full cycle (i.e. year) constitutes
+        of 360 time units (i.e. days). OTOH psi=1 means the time unit
+        is a year.
+    - omega: float, optional
+        Rate of change of betas. Ignore in current simulation, but you can dig in and play with it.
+    - eps1: float
+        Force of environmental driver effect on transmission for pathogen 1.
+    - eps2: float
+        Force of environmental driver effect on transmission for pathogen 2.
+    - n_pathogens: int
+        Number of pathogens in the simulation.
+    - test_noise: np.array
+        A noise array used for testing. User should ignore this.
+    - seed: int, optional
+        Seed for random number generator. Default is np.nan (no seed).
+    - S_init: array
+        Initial number of susceptibles.
+    - I_init: array
+        Initial number of infected individuals.
+    - continuous_force: bool
+        Whether to apply a continuous force (sine wave) of infection or a piecewise constant forcing.
+    - drop_burnin: bool
+        Whether to exclude burn-in time from the returned time series.
+
+    Returns:
+    A pandas dataframe with the time series of susceptibles, infected, and possibly other states,
+    depending on the implementation specifics.
+
+    User should utilize C1 and C2 columns, which represent number of cases in the time before the sampling time. F1 and F2 the environmental drivers.
+    """
+    
     t_end = (run_years + burn_in_years) * psi
     n_output = int(ceil(t_end / dt_output))
     logS = np.empty((n_output + 1, 2))

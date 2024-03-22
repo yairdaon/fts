@@ -3,8 +3,6 @@ from itertools import product
 import numpy as np
 import pandas as pd
 
-from sklearn.linear_model import LinearRegression 
-
 BURN_IN_YEARS = 2000
 COMMON = {
     'beta_slope': 0,
@@ -33,8 +31,15 @@ COBEY = {
     'omega': 0,
     'mu': 1 / 30 / 360}
 
-def make_simulation_params(what, pnas=None, fast=False, **kwargs):
+def make_simulation_params(what,
+                           pnas=None,
+                           fast=False,
+                           **kwargs):
+    """Generate a list of dictionaries. Each dictionary is contains
+    parameters for a two-strain simulation run. Any keyword argument
+    you add will override parameters.
 
+    """
     if what == 'measles':
         specific = MEASLES
         pnas_ = [1e-2] + [0, 1e-6, 1e-5, 1e-4, 1e-3] 
@@ -69,6 +74,8 @@ def make_simulation_params(what, pnas=None, fast=False, **kwargs):
 
     
 def random_IC():
+    """Generate random initial condition
+    """    
     init = np.random.exponential(scale=1.0, size=6).reshape(3, 2)
     init = init / init.sum(axis=0)
     S_init = init[0, :]
