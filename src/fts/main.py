@@ -1,8 +1,8 @@
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from helpers import make_simulation_params, random_IC
-from multistrain import run
+from .helpers import make_simulation_params, random_IC
+from .multistrain import run
 
 def main():
 
@@ -21,14 +21,11 @@ def main():
     df[['C1', 'C2']].plot()
     plt.show()
     
-
-    ## Uncomment if you want to check reproducibility
-    # S_init, I_init = random_IC()
-    # df = run(**params[3], seed=3, S_init=S_init, I_init=I_init)
-    # print(df.head())
-
-    # df = run(**params[3], seed=3, S_init=S_init, I_init=I_init)
-    # print(df.head())
+    ## Check reproducibility
+    S_init, I_init = random_IC()
+    df1 = run(**params[3], seed=3, S_init=S_init, I_init=I_init)
+    df2 = run(**params[3], seed=3, S_init=S_init, I_init=I_init)
+    assert df1.equals(df2)
 
     
 if __name__ == '__main__':

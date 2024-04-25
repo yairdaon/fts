@@ -6,7 +6,7 @@ from collections import OrderedDict
 import numpy as np
 from numpy import sin, pi, log, exp, sqrt, ceil, log1p
 
-from fts.helpers import random_IC
+from .helpers import random_IC
 
 
 def multistrain_sde(

@@ -7,7 +7,7 @@ from numba import jit
 from numba.core import types
 from numpy import sin, cos, pi, log, exp, sqrt, ceil
 
-from helpers import random_IC
+from .helpers import random_IC
 
 
 @jit(nopython=True)
