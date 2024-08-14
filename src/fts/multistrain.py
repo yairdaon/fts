@@ -7,7 +7,7 @@ from numba import jit
 from numba.core import types
 from numpy import sin, cos, pi, log, exp, sqrt, ceil
 
-from .helpers import random_IC
+from .helpers import random_IC, make_simulation_params
 
 
 @jit(nopython=True)
@@ -137,7 +137,7 @@ def run(run_years,
         S_init=None,
         I_init=None,
         continuous_force=True,
-        drop_burnin=False,
+        drop_burn_in=False,
         **kwargs):
     """Native python code to allocate arrays for and appropriately pack
     the results of the numba code above
@@ -194,7 +194,7 @@ def run(run_years,
         Initial number of infected individuals.
     - continuous_force: bool
         Whether to apply a continuous force (sine wave) of infection or a piecewise constant forcing.
-    - drop_burnin: bool
+    - drop_burn_in: bool
         Whether to exclude burn-in time from the returned time series.
 
     Returns:
@@ -267,6 +267,7 @@ def run(run_years,
     df['I1'] = np.exp(df.logI1) 
     df['I2'] = np.exp(df.logI2) 
     df['S1'] = np.exp(df.logS1) 
+
     df['S2'] = np.exp(df.logS2) 
 
     # This makes test pass with zero numerical error but it is not
@@ -279,5 +280,15 @@ def run(run_years,
     # df[['C1', 'C2']] = np.maximum(df[['C1', 'C2']].values, 0)
 
     df['C1C2'] = df.C1 + df.C2 / np.e
-    df = df.query("index > @burn_in_years * @psi") if drop_burnin else df
+    df = df.query("index > @burn_in_years * @psi") if drop_burn_in else df
     return df
+
+
+def measles():
+    params = make_simulation_params(pna=0, ona=0, what='measles')[0]
+    df = run(drop_burn_in=True, **params)[['C1', 'C2']]
+
+    df.index = pd.date_range(start='1900-01-01', periods=df.shape[0], freq='7d')
+
+    return df
+    
