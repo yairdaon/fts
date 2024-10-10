@@ -108,7 +108,6 @@ def multistrain_sde(
         logIs[output_iter + 1, :] = logI
         CCs[output_iter + 1, :] = CC
         Cs[output_iter + 1, :] = np.maximum(0, dCC)
-        Ts[output_iter + 1] = t
         Fs[output_iter, :] = exp(log_betas)
 
 
