@@ -53,8 +53,7 @@ def multistrain_sde(
     CC = CCs[0, :]
     h = dt_euler
 
-    for output_iter in range(n_output):
-        t = output_iter * dt_output
+    for output_iter, t in enumerate(Ts):
         t_next_output = (output_iter + 1) * dt_output
 
         while t < t_next_output:
@@ -211,7 +210,7 @@ def run(run_years,
     CC = np.zeros((n_output + 1, 2))
     C = np.zeros((n_output + 1, 2))
     F = np.ones((n_output + 1, 2))
-    T = np.zeros(n_output + 1)
+    T = np.arange(n_output + 1) * dt_output
 
     if S_init is None or I_init is None:
         S_init, I_init = random_IC()
@@ -284,11 +283,11 @@ def run(run_years,
     return df
 
 
-def measles():
-    params = make_simulation_params(pna=0, ona=0, what='measles')[0]
+
+def measles(run_years=200):
+    params = make_simulation_params(pna=0, ona=0, run_years=run_years, what='measles')[0]
     df = run(drop_burn_in=True, **params)[['C1', 'C2']]
-
     df.index = pd.date_range(start='1900-01-01', periods=df.shape[0], freq='7d')
-
+    df.index.name = 'time'
     return df
-    
+ 
