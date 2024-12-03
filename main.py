@@ -5,6 +5,7 @@ from fts import measles ## You need to (e.g. pip) install the package
                         
 
 def main():
+
     df = measles(run_years=20)
     deltas = df.index.diff()
     assert deltas.nunique() == 1, deltas

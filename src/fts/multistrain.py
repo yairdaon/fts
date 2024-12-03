@@ -6,6 +6,7 @@ import pandas as pd
 from numba import jit
 from numba.core import types
 from numpy import sin, cos, pi, log, exp, sqrt, ceil
+from pprint import pprint
 
 from .helpers import random_IC, make_simulation_params
 
@@ -121,7 +122,7 @@ def run(run_years,
         ona=0, 
         beta_slope=0,
         beta_change_start=0,
-        dt_output=30,
+        freq=30,
         dt_euler=5e-2,
         mu=1/30/360,
         nu=0.2,
@@ -136,6 +137,7 @@ def run(run_years,
         I_init=None,
         continuous_force=True,
         drop_burn_in=False,
+        what='measles',
         **kwargs):
     """Native python code to allocate arrays for and appropriately pack
     the results of the numba code above
@@ -161,8 +163,8 @@ def run(run_years,
         Slope of change in beta (transmission force) over time.
     - beta_change_start: int
         Year when change in beta starts.
-    - dt_output: float
-        Sampling time for output data.
+    - freq: int
+        Sampling time for output data, in days
     - dt_euler: float
         Time step for numerical integration using Eulers method.
     - mu: float, optional
@@ -201,7 +203,10 @@ def run(run_years,
 
     User should utilize C1 and C2 columns, which represent number of cases in the time before the sampling time. F1 and F2 the environmental drivers.
     """
-    
+    if what == 'measles':
+        dt_output = freq / 365
+    elif what == 'cobey':
+        dt_output = freq
     t_end = (run_years + burn_in_years) * psi
     n_output = int(ceil(t_end / dt_output))
     logS = np.empty((n_output + 1, 2))
@@ -279,14 +284,15 @@ def run(run_years,
 
     df['C1C2'] = df.C1 + df.C2 / np.e
     df = df.query("index > @burn_in_years * @psi") if drop_burn_in else df
+    df.index = pd.date_range(start='1900-01-01', periods=df.shape[0], freq=str(freq) + 'D')
+    df.index.name = 'time'
     return df
 
 
 
 def measles(run_years=200):
-    params = make_simulation_params(pna=0, ona=0, run_years=run_years, what='measles')[0]
+    params = make_simulation_params(pna=0.01, ona=0.01, run_years=run_years, what='measles')[0]
+    pprint(params)
     df = run(drop_burn_in=True, **params)[['C1', 'C2']]
-    df.index = pd.date_range(start='1900-01-01', periods=df.shape[0], freq='7d')
-    df.index.name = 'time'
     return df
  

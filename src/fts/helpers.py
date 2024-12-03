@@ -14,22 +14,26 @@ COMMON = {
 MEASLES = {
     'beta1': 1600,
     'beta2': 1600,
-    'dt_output': 7 / 365,
+    #'dt_output': 7 / 365,
     'dt_euler': 1/ 10 / 365,
     'nu':  66,
     'psi': 1,
     'omega': 0,
-    'mu': 1 / 50}
+    'mu': 1 / 50,
+    'freq': 7,
+    'what': 'measles'}
 
 COBEY = {
     'beta1': 0.3,
     'beta2': 0.25,
-    'dt_output': 7,
+    #'dt_output': 7,
     'dt_euler': 5e-2,
     'nu':  0.2,
     'psi': 360,
     'omega': 0,
-    'mu': 1 / 30 / 360}
+    'mu': 1 / 30 / 360,
+    'freq': 7,
+    'what': 'cobey'}
 
 def make_simulation_params(what,
                            pnas=None,
