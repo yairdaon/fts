@@ -54,7 +54,7 @@ def multistrain_sde(
     CC = CCs[0, :]
     h = dt_euler
 
-    for output_iter, t in enumerate(Ts):
+    for output_iter, t in enumerate(Ts[1:]):
         t_next_output = (output_iter + 1) * dt_output
 
         while t < t_next_output:
