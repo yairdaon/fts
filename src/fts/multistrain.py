@@ -3,11 +3,78 @@ import time
 
 import numpy as np
 import pandas as pd
-from numba import jit
+from numba import jit, njit
 from numba.core import types
 from numpy import sin, cos, pi, log, exp, sqrt, ceil
 
 from .helpers import random_IC, make_simulation_params
+
+@jit(nopython=True)
+def calc_log_betas(t,
+                   beta0,
+                   eps,
+                   psi,
+                   omega,
+                   n_pathogens,
+                   log_betas):
+    for pathogen_id in range(n_pathogens):
+        b = beta0[pathogen_id] * (1.0 + eps[pathogen_id] * sin(2.0 * pi / psi * (t - omega[pathogen_id] * psi)))
+        log_betas[pathogen_id] = log(b)
+    return log_betas
+
+@jit(nopython=True)
+def one_step(t,
+             h,
+             logS,
+             dlogS,
+             logI,
+             dlogI,
+             CC,
+             dCC,
+             log_mu,
+             sigma,
+             nu,
+             beta0,
+             eps,
+             psi,
+             omega,
+             n_pathogens,
+             log_betas,
+             sd_proc,
+             test_noise=None):
+
+    mu = exp(log_mu)
+    sqrt_h = sqrt(h)
+    log_betas[:] = calc_log_betas(t, beta0, eps, psi, omega, n_pathogens, log_betas)
+    
+    noise = np.random.randn(n_pathogens) if test_noise is None else test_noise.copy()
+    noise *= sd_proc
+
+    dlogS[:] = 0
+    dlogI[:] = 0
+    dCC[:] = 0
+            
+    for i in range(n_pathogens):
+        dlogS[i] += (exp(log_mu - logS[i]) - mu) * h
+
+        for j in range(n_pathogens):
+            if i != j:
+                dlogSRij = sigma[i][j] * exp(log_betas[j] + logI[j])
+                dlogS[i] -= dlogSRij * h
+                dlogS[i] -= dlogSRij * noise[j] * sqrt_h
+        dlogS[i] -= exp(log_betas[i] + logI[i]) * h
+        dlogI[i] += exp(log_betas[i] + logS[i]) * h
+        dCC[i] += exp(log_betas[i] + logS[i] + logI[i]) * h
+
+        # Process noise
+        dlogS[i] -= exp(log_betas[i] + logI[i]) * noise[i] * sqrt_h
+        dlogI[i] += exp(log_betas[i] + logS[i]) * noise[i] * sqrt_h
+        dCC[i] += exp(log_betas[i] + logS[i] + logI[i]) * noise[i] * sqrt_h
+        dlogI[i] -= (nu[i] + mu) * h
+
+    logS[:] = logS + dlogS
+    logI[:] = logI + dlogI
+    CC[:] = CC + dCC
 
 
 @jit(nopython=True)
@@ -43,74 +110,58 @@ def multistrain_sde(
     if seed is not None:# and isinstance(seed, types.Integer):
         np.random.seed(seed)
 
-    pathogen_ids = range(n_pathogens)
+    
     log_mu = log(mu)
+               
+    for output_iter in range(logSs.shape[0]-1):
+        t = output_iter * dt_output
+        t_next_output = t + dt_output
 
-    n_output = int(ceil(t_end / dt_output))
+        log_betas[:] = calc_log_betas(t, beta0, eps, psi, omega, n_pathogens, log_betas)
+        Fs[output_iter, :] = exp(log_betas)
+        Ts[output_iter] = t
 
-    logS = logSs[0, :]
-    logI = logIs[0, :]
-    CC = CCs[0, :]
-    h = dt_euler
-
-    for output_iter, t in enumerate(Ts):
-        t_next_output = (output_iter + 1) * dt_output
-
+        ## Get "initial conditions" for this output cycle
+        logS = logSs[output_iter, :]
+        logI = logIs[output_iter, :]
+        CC = CCs[output_iter, :]
+       
         while t < t_next_output:
-            t_next = t + h
-            if t_next > t_next_output:
-                t_next = t_next_output
+            t_next = min(t + dt_euler, t_next_output)
 
-            hh = t_next - t
-            sqrt_hh = sqrt(hh)
+            one_step(t,
+                     t_next - t,
+                     logS,
+                     dlogS,
+                     logI,
+                     dlogI,
+                     CC,
+                     dCC,
+                     log_mu,
+                     sigma,
+                     nu,
+                     beta0,
+                     eps,
+                     psi,
+                     omega,
+                     n_pathogens,
+                     log_betas,
+                     sd_proc,
+                     test_noise=None)
 
-            for pathogen_id in pathogen_ids:
-                factor = (beta0[pathogen_id] + max(0.0, t - beta_change_start[pathogen_id]) * beta_slope[pathogen_id])
-                if continuous_force:
-                    cycle = sin(2.0 * pi / psi * (t - omega[pathogen_id] * psi))
-                else:
-                    cycle = 1 if t % 1 > 0.5 else 0
-                b = factor * (1.0 + eps[pathogen_id] * cycle)
-                log_betas[pathogen_id] = log(b)
-            
-
-            noise = np.random.randn(n_pathogens) if test_noise is None else test_noise.copy()
-            noise *= sd_proc
-
-            dlogS[:] = 0
-            dlogI[:] = 0
-            dCC[:] = 0
-            
-            for i in pathogen_ids:
-                dlogS[i] += (exp(log_mu - logS[i]) - mu) * hh
-
-                for j in pathogen_ids:
-                    if i != j:
-                        dlogSRij = sigma[i][j] * exp(log_betas[j] + logI[j])
-                        dlogS[i] -= dlogSRij * hh
-                        dlogS[i] -= dlogSRij * noise[j] * sqrt_hh
-                dlogS[i] -= exp(log_betas[i] + logI[i]) * hh
-                dlogI[i] += exp(log_betas[i] + logS[i]) * hh
-                dCC[i] += exp(log_betas[i] + logS[i] + logI[i]) * hh
-
-                # Process noise
-                dlogS[i] -= exp(log_betas[i] + logI[i]) * noise[i] * sqrt_hh
-                dlogI[i] += exp(log_betas[i] + logS[i]) * noise[i] * sqrt_hh
-                dCC[i] += exp(log_betas[i] + logS[i] + logI[i]) * noise[i] * sqrt_hh
-                dlogI[i] -= (nu[i] + mu) * hh
-
-            logS = logS + dlogS
-            logI = logI + dlogI
-            CC = CC + dCC
+                     
             t = t_next
+
+           
 
         logSs[output_iter + 1, :] = logS
         logIs[output_iter + 1, :] = logI
         CCs[output_iter + 1, :] = CC
         Cs[output_iter + 1, :] = np.maximum(0, dCC)
-        Ts[output_iter + 1] = t
-        Fs[output_iter, :] = exp(log_betas)
 
+    log_betas[:] = calc_log_betas(t, beta0, eps, psi, omega, n_pathogens, log_betas)
+    Fs[-1, :] = exp(log_betas)
+    Ts[-1] = t
 
 def run(run_years,
         burn_in_years,
@@ -284,9 +335,10 @@ def run(run_years,
 
 
 
-def measles(run_years=200):
-    params = make_simulation_params(pna=0, ona=0, run_years=run_years, what='measles')[0]
-    df = run(drop_burn_in=True, **params)[['C1', 'C2']]
+def measles(**kwargs):
+    params = make_simulation_params(what='measles',
+                                    **kwargs)[0]
+    df = run(**params)
     df.index = pd.date_range(start='1900-01-01', periods=df.shape[0], freq='7d')
     df.index.name = 'time'
     return df
