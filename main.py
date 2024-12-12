@@ -10,8 +10,8 @@ def main():
     deltas = df.index.diff()
     assert deltas.nunique() == 1, deltas
     df.plot(title='C1 and C2 are cumulative weekly new cases (incidence)')
-    plt.show()
-    #import pdb; pdb.set_trace()
+    plt.savefig('res.png')
+    
     
 if __name__ == '__main__':
     try:
