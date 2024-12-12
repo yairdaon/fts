@@ -31,7 +31,7 @@ def one_step(t,
              dlogI,
              CC,
              dCC,
-             log_mu,
+             mu,
              sigma,
              nu,
              beta0,
@@ -43,7 +43,6 @@ def one_step(t,
              sd_proc,
              test_noise=None):
 
-    mu = exp(log_mu)
     sqrt_h = sqrt(h)
     log_betas[:] = calc_log_betas(t, beta0, eps, psi, omega, n_pathogens, log_betas)
     
@@ -55,7 +54,7 @@ def one_step(t,
     dCC[:] = 0
             
     for i in range(n_pathogens):
-        dlogS[i] += (exp(log_mu - logS[i]) - mu) * h
+        dlogS[i] += (exp(log(mu) - logS[i]) - mu) * h
 
         for j in range(n_pathogens):
             if i != j:
@@ -80,7 +79,6 @@ def one_step(t,
 @jit(nopython=True)
 def multistrain_sde(
         dt_euler,
-        t_end,
         dt_output, 
         n_pathogens, 
         logSs,
@@ -110,9 +108,7 @@ def multistrain_sde(
     if seed is not None:# and isinstance(seed, types.Integer):
         np.random.seed(seed)
 
-    
-    log_mu = log(mu)
-               
+                   
     for output_iter in range(logSs.shape[0]-1):
         t = output_iter * dt_output
         t_next_output = t + dt_output
@@ -137,7 +133,7 @@ def multistrain_sde(
                      dlogI,
                      CC,
                      dCC,
-                     log_mu,
+                     mu,
                      sigma,
                      nu,
                      beta0,
@@ -256,17 +252,18 @@ def run(run_years,
     
     t_end = (run_years + burn_in_years) * psi
     n_output = int(ceil(t_end / dt_output))
-    logS = np.empty((n_output + 1, 2))
-    logI = np.empty((n_output + 1, 2))
-    CC = np.zeros((n_output + 1, 2))
-    C = np.zeros((n_output + 1, 2))
-    F = np.ones((n_output + 1, 2))
-    T = np.arange(n_output + 1) * dt_output
+    logS = np.full((n_output, 2), np.nan)
+    logI = np.full((n_output, 2), np.nan)
+    CC = np.full((n_output, 2), np.nan)
+    C = np.full((n_output, 2), np.nan)
+    F = np.full((n_output, 2), np.nan)
+    T = np.full(n_output, np.nan)
 
     if S_init is None or I_init is None:
         S_init, I_init = random_IC()
     logS[0, :] = log(S_init)
     logI[0, :] = log(I_init)
+    CC[0, :] = 0.
     beta0 = np.array([beta1, beta2], dtype=np.float64)
     sigma = np.array([[1, sigma12],
                       [sigma21, 1]])
@@ -280,7 +277,6 @@ def run(run_years,
     start = time.time()
     multistrain_sde(
         dt_euler=dt_euler,
-        t_end=t_end,
         dt_output=dt_output,
         n_pathogens=n_pathogens,
         logSs=logS,
@@ -308,7 +304,6 @@ def run(run_years,
         seed=seed)
     end = time.time()
     # print("Simulation run time", (end - start) / 60, "minutes", flush=True)
-    F[-1, :] = beta0 * (1 + eps * np.sin(2 * np.pi * T[-1]/psi))
     # logI += np.random.randn(*logI.shape) * ona
     cols = ['logS1', 'logS2', 'logI1', 'logI2', 'CC1', 'CC2', 'C1', 'C2', 'F1', 'F2']
     data = np.hstack([logS, logI, CC, C, F])
@@ -322,15 +317,15 @@ def run(run_years,
 
     # This makes test pass with zero numerical error but it is not
     # good cuz it gives too many zeros and fucks up Rypdal-Sugihara
-    df['D1'] = np.insert(np.diff(df.CC1.values),0, [0])
-    df['D2'] = np.insert(np.diff(df.CC2.values),0, [0])    
-    df['D1'] = np.maximum(0, df.D1)
-    df['D2'] = np.maximum(0, df.D2)
+    # df['D1'] = np.insert(np.diff(df.CC1.values),0, [0])
+    # df['D2'] = np.insert(np.diff(df.CC2.values),0, [0])    
+    # df['D1'] = np.maximum(0, df.D1)
+    # df['D2'] = np.maximum(0, df.D2)
     
     # df[['C1', 'C2']] = np.maximum(df[['C1', 'C2']].values, 0)
 
-    df['C1C2'] = df.C1 + df.C2 / np.e
-    df = df.query("index > @burn_in_years * @psi") if drop_burn_in else df
+    # df['C1C2'] = df.C1 + df.C2 / np.e
+    df = df.query("index >= @burn_in_years * @psi") if drop_burn_in else df
     return df
 
 
@@ -339,6 +334,7 @@ def measles(**kwargs):
     params = make_simulation_params(what='measles',
                                     **kwargs)[0]
     df = run(**params)
+    assert not df.isnull().any().any()
     df.index = pd.date_range(start='1900-01-01', periods=df.shape[0], freq='7d')
     df.index.name = 'time'
     return df

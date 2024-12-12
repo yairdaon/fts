@@ -12,7 +12,6 @@ def main():
     df.plot(title='C1 and C2 are cumulative weekly new cases (incidence)')
     plt.savefig('res.png')
     
-    
 if __name__ == '__main__':
     try:
         main()
