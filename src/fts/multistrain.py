@@ -70,7 +70,7 @@ def one_step(t,
         dlogI[i] += exp(log_betas[i] + logS[i]) * noise[i] * sqrt_h
         dCC[i] += exp(log_betas[i] + logS[i] + logI[i]) * noise[i] * sqrt_h
         dlogI[i] -= (nu[i] + mu) * h
-
+  
     logS[:] = logS + dlogS
     logI[:] = logI + dlogI
     CC[:] = CC + dCC
@@ -90,8 +90,6 @@ def multistrain_sde(
         mu,
         nu,
         beta0,
-        beta_change_start,
-        beta_slope,
         psi,
         omega,
         eps,
@@ -101,8 +99,6 @@ def multistrain_sde(
         dlogI,
         dCC,
         log_betas,
-        continuous_force,
-        test_noise,
         seed):
     """ Numba code to run the two-strain model """
     if seed is not None:# and isinstance(seed, types.Integer):
@@ -148,12 +144,10 @@ def multistrain_sde(
                      
             t = t_next
 
-           
-
         logSs[output_iter + 1, :] = logS
         logIs[output_iter + 1, :] = logI
         CCs[output_iter + 1, :] = CC
-        Cs[output_iter + 1, :] = np.maximum(0, dCC)
+        Cs[output_iter + 1, :] = np.maximum(0, dCC) ## This *should* be null in the first step!!!
 
     log_betas[:] = calc_log_betas(t, beta0, eps, psi, omega, n_pathogens, log_betas)
     Fs[-1, :] = exp(log_betas)
@@ -167,8 +161,6 @@ def run(run_years,
         sigma21=0,
         pna=0,
         ona=0, 
-        beta_slope=0,
-        beta_change_start=0,
         dt_output=30,
         dt_euler=5e-2,
         mu=1/30/360,
@@ -178,7 +170,6 @@ def run(run_years,
         eps1=0.1,
         eps2=0.1,
         n_pathogens=2,
-        test_noise=None,
         seed=None,#np.nan,
         S_init=None,
         I_init=None,
@@ -205,10 +196,6 @@ def run(run_years,
         Process noise amplitude.
     - ona: float
         Observation noise amplitude.
-    - beta_slope: float
-        Slope of change in beta (transmission force) over time.
-    - beta_change_start: int
-        Year when change in beta starts.
     - dt_output: float
         Sampling time for output data.
     - dt_euler: float
@@ -241,7 +228,8 @@ def run(run_years,
     - continuous_force: bool
         Whether to apply a continuous force (sine wave) of infection or a piecewise constant forcing.
     - drop_burn_in: bool
-        Whether to exclude burn-in time from the returned time series.
+        Whether to exclude burn-in time from the returned time series. If you dont drop the burn in phase,
+        the initial step will contain NaN / null values for the first step of C1 and C2
 
     Returns:
     A pandas dataframe with the time series of susceptibles, infected, and possibly other states,
@@ -271,8 +259,6 @@ def run(run_years,
     nu = np.full(n_pathogens, nu)
     omega = np.full(n_pathogens, omega)
     eps = np.array([eps1, eps2])
-    beta_change_start = np.full(n_pathogens, beta_change_start)
-    beta_slope = np.full(n_pathogens, beta_slope)
 
     start = time.time()
     multistrain_sde(
@@ -288,8 +274,6 @@ def run(run_years,
         mu=mu,
         nu=nu,
         beta0=beta0,
-        beta_change_start=beta_change_start,
-        beta_slope=beta_slope,
         psi=psi,
         omega=omega,
         eps=eps,
@@ -299,8 +283,6 @@ def run(run_years,
         dlogI=np.zeros(n_pathogens),
         dCC=np.zeros(n_pathogens),
         log_betas=np.empty(n_pathogens),
-        continuous_force=continuous_force,
-        test_noise=test_noise,
         seed=seed)
     end = time.time()
     # print("Simulation run time", (end - start) / 60, "minutes", flush=True)
@@ -330,11 +312,11 @@ def run(run_years,
 
 
 
-def measles(**kwargs):
+def measles(**kwargs,):
     params = make_simulation_params(what='measles',
+                                    drop_burn_in=True,
                                     **kwargs)[0]
     df = run(**params)
-    assert not df.isnull().any().any()
     df.index = pd.date_range(start='1900-01-01', periods=df.shape[0], freq='7d')
     df.index.name = 'time'
     return df
