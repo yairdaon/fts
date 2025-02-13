@@ -312,8 +312,9 @@ def run(run_years,
 
 
 
-def measles(**kwargs,):
-    params = make_simulation_params(what='measles',
+def simulate(what='measles',
+             **kwargs):
+    params = make_simulation_params(what=what,
                                     drop_burn_in=True,
                                     **kwargs)[0]
     df = run(**params)

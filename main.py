@@ -1,14 +1,15 @@
 from matplotlib import pyplot as plt
 import pdb
 
-from src.fts import measles ## You need to (e.g. pip) install the package
-                        ## for this to work.
+from src.fts import simulate ## You need to (e.g. pip) install the
+                             ## package for this to work.
                         
 
 def main():
-    df = measles(run_years=7,
-                 burn_in_years=2000,
-                 pna=0, ona=0)[['C1', 'C2', 'F1']]
+    df = simulate(what='measles',
+                  run_years=7,
+                  burn_in_years=2000,
+                  pna=0, ona=0)[['C1', 'C2', 'F1']]
     df = (df - df.mean()) /df.std()
     deltas = df.index.diff()
     assert deltas.nunique() == 1, deltas
