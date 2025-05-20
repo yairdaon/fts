@@ -1,9 +1,7 @@
 # fts
 
-A fast implementation of the two-strain model of Cobey and Baskerville
-from "Limits to Causal Inference with State-Space Reconstruction for
-Infectious Disease".
+A fast implementation of a two-strain model for cross-immunization from "A status-based approach to multiple strain dynamics"
+by Gog and Swinton. https://link.springer.com/article/10.1007/s002850100120
 
 See `main.py` for example usage. Code relies on standard libraries. Particularly, it requires the `numba` package to be installed.
 
-https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169050
